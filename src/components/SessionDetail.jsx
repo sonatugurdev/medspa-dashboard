@@ -315,9 +315,20 @@ function ClinicalTab({ clinical }) {
         if (!val) return null;
         return (
           <SectionCard key={s.key} title={s.label}>
-            <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.75, margin: 0 }}>
-              {typeof val === "string" ? val : JSON.stringify(val)}
-            </p>
+            {typeof val === "string" ? (
+              <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.75, margin: 0 }}>{val}</p>
+            ) : Array.isArray(val) ? (
+              <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                {val.map((item, i) => (
+                  <li key={i} style={{ fontSize: 13, color: "var(--text-secondary)", padding: "5px 0", borderBottom: i < val.length - 1 ? "1px solid var(--border)" : "none", display: "flex", gap: 8 }}>
+                    <span style={{ color: "var(--teal)", fontWeight: 700, flexShrink: 0 }}>·</span>
+                    {typeof item === "string" ? item : item.text || item.content || item.description || JSON.stringify(item)}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <pre style={{ fontSize: 12, color: "var(--text-secondary)", whiteSpace: "pre-wrap", margin: 0, fontFamily: "var(--font-mono)" }}>{JSON.stringify(val, null, 2)}</pre>
+            )}
           </SectionCard>
         );
       })}
@@ -350,7 +361,7 @@ function TreatmentTab({ analysis, concerns }) {
               }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>#{i + 1}</span>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{r.treatment || r}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{typeof r === "string" ? r : r.treatment || r.recommendation || r.text || JSON.stringify(r)}</div>
                   {r.concern && <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 2 }}>For: {r.concern}</div>}
                 </div>
                 {r.priority && <PriorityBadge priority={r.priority} />}
@@ -365,7 +376,7 @@ function TreatmentTab({ analysis, concerns }) {
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {homecare.map((item, i) => (
               <li key={i} style={{ fontSize: 13, color: "var(--text-secondary)", padding: "6px 0", borderBottom: i < homecare.length - 1 ? "1px solid var(--border)" : "none", display: "flex", gap: 8 }}>
-                <span style={{ color: "var(--teal)", fontWeight: 700 }}>·</span>{item}
+                <span style={{ color: "var(--teal)", fontWeight: 700 }}>·</span>{typeof item === "string" ? item : item.text || item.recommendation || JSON.stringify(item)}
               </li>
             ))}
           </ul>
@@ -377,7 +388,7 @@ function TreatmentTab({ analysis, concerns }) {
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {inClinic.map((item, i) => (
               <li key={i} style={{ fontSize: 13, color: "var(--text-secondary)", padding: "6px 0", borderBottom: i < inClinic.length - 1 ? "1px solid var(--border)" : "none", display: "flex", gap: 8 }}>
-                <span style={{ color: "var(--teal)", fontWeight: 700 }}>·</span>{item}
+                <span style={{ color: "var(--teal)", fontWeight: 700 }}>·</span>{typeof item === "string" ? item : item.text || item.recommendation || JSON.stringify(item)}
               </li>
             ))}
           </ul>
@@ -620,13 +631,32 @@ function FlagGrid({ data }) {
   );
 }
 
+function safeDisplay(v) {
+  if (v == null) return null;
+  if (typeof v === "boolean") return v ? "Yes" : null;
+  if (typeof v === "string") return v || null;
+  if (typeof v === "number") return String(v);
+  if (Array.isArray(v)) {
+    if (v.length === 0) return null;
+    // Array of primitives → join; array of objects → JSON
+    return v.every(i => typeof i !== "object") ? v.join(", ") : JSON.stringify(v);
+  }
+  if (typeof v === "object") {
+    // Nested object — render as indented sub-keys
+    const entries = Object.entries(v).filter(([, val]) => val != null && val !== false && val !== "");
+    if (!entries.length) return null;
+    return entries.map(([k, val]) => `${k.replace(/_/g, " ")}: ${safeDisplay(val)}`).join(" · ");
+  }
+  return String(v);
+}
+
 function DataGrid({ data }) {
   if (!data || typeof data !== "object") return null;
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
       {Object.entries(data).map(([k, v]) => {
-        if (v == null || v === "" || v === false) return null;
-        const displayV = typeof v === "boolean" ? "Yes" : Array.isArray(v) ? v.join(", ") : String(v);
+        const displayV = safeDisplay(v);
+        if (displayV == null) return null;
         return (
           <div key={k} style={{ padding: "8px 10px", background: "var(--bg)", borderRadius: 6, border: "1px solid var(--border)" }}>
             <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 2 }}>
