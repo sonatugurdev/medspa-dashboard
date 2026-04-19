@@ -339,10 +339,11 @@ function ClinicalTab({ clinical }) {
 // ── Treatment Plan Tab ──
 function TreatmentTab({ analysis, concerns }) {
   const recs = analysis.treatment_recommendations || [];
+  const contras = analysis.contraindications || [];
   const homecare = analysis.homecare_recommendations || [];
   const inClinic = analysis.in_clinic_recommendations || [];
 
-  if (!recs.length && !homecare.length && !inClinic.length && !concerns.length) {
+  if (!recs.length && !contras.length && !homecare.length && !inClinic.length && !concerns.length) {
     return <EmptyState message="No treatment recommendations available." />;
   }
 
@@ -350,23 +351,67 @@ function TreatmentTab({ analysis, concerns }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {recs.length > 0 && (
         <SectionCard title="Prioritized Recommendations">
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {recs.map((r, i) => (
-              <div key={i} style={{
-                display: "grid", gridTemplateColumns: "auto 1fr auto",
-                alignItems: "center", gap: 12,
-                padding: "10px 14px", borderRadius: 8,
-                background: i % 2 === 0 ? "var(--bg)" : "var(--surface)",
-                border: "1px solid var(--border)",
-              }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>#{i + 1}</span>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{typeof r === "string" ? r : r.treatment || r.recommendation || r.text || JSON.stringify(r)}</div>
-                  {r.concern && <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 2 }}>For: {r.concern}</div>}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {recs.map((r, i) => {
+              const label = typeof r === "string" ? r : r.concern || r.treatment || r.recommendation || r.text || "Treatment";
+              const approaches = typeof r === "object" && Array.isArray(r.approaches) ? r.approaches : [];
+              const notes = typeof r === "object" ? r.notes : null;
+              return (
+                <div key={i} style={{
+                  padding: "12px 14px", borderRadius: 8,
+                  background: i % 2 === 0 ? "var(--bg)" : "var(--surface)",
+                  border: "1px solid var(--border)",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: approaches.length || notes ? 8 : 0 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", fontFamily: "var(--font-mono)", flexShrink: 0 }}>#{i + 1}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", flex: 1 }}>{label}</span>
+                    {r.priority && <PriorityBadge priority={r.priority} />}
+                  </div>
+                  {approaches.length > 0 && (
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: notes ? 6 : 0 }}>
+                      {approaches.map((a, j) => (
+                        <span key={j} style={{ padding: "3px 9px", borderRadius: 4, fontSize: 11.5, background: "var(--teal-subtle)", color: "var(--teal)", border: "1px solid var(--teal)" }}>{a}</span>
+                      ))}
+                    </div>
+                  )}
+                  {notes && <div style={{ fontSize: 11.5, color: "var(--text-muted)", fontStyle: "italic" }}>{notes}</div>}
                 </div>
-                {r.priority && <PriorityBadge priority={r.priority} />}
-              </div>
-            ))}
+              );
+            })}
+          </div>
+        </SectionCard>
+      )}
+
+      {contras.length > 0 && (
+        <SectionCard title="⚠️ Contraindications">
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {contras.map((c, i) => {
+              const name = typeof c === "string" ? c : c.name || "Contraindication";
+              const blocks = typeof c === "object" && Array.isArray(c.blocks) ? c.blocks : [];
+              const message = typeof c === "object" ? c.message : null;
+              const severity = typeof c === "object" ? c.severity : null;
+              const isAbsolute = severity === "ABSOLUTE";
+              return (
+                <div key={i} style={{
+                  padding: "12px 14px", borderRadius: 8,
+                  background: isAbsolute ? "var(--red-subtle)" : "var(--amber-subtle)",
+                  border: `1px solid ${isAbsolute ? "var(--red)" : "var(--amber)"}`,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: blocks.length || message ? 6 : 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: isAbsolute ? "var(--red)" : "var(--amber)", flex: 1 }}>{name}</span>
+                    {severity && <span style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: isAbsolute ? "var(--red)" : "var(--amber)", color: "white" }}>{severity}</span>}
+                  </div>
+                  {blocks.length > 0 && (
+                    <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: message ? 6 : 0 }}>
+                      {blocks.map((b, j) => (
+                        <span key={j} style={{ padding: "2px 8px", borderRadius: 4, fontSize: 11.5, background: "white", border: `1px solid ${isAbsolute ? "var(--red)" : "var(--amber)"}`, color: isAbsolute ? "var(--red)" : "var(--amber)" }}>No {b}</span>
+                      ))}
+                    </div>
+                  )}
+                  {message && <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5 }}>{message}</div>}
+                </div>
+              );
+            })}
           </div>
         </SectionCard>
       )}
@@ -517,14 +562,25 @@ function ScoreBadge({ score }) {
   );
 }
 
+
+function cvValue(v) {
+  if (v == null) return null;
+  if (typeof v === "number") return v;
+  if (typeof v === "object") {
+    // MakeupAR returns {ui_score, raw_score} — ui_score is 0-100 display value
+    return v.ui_score ?? v.raw_score ?? null;
+  }
+  return null;
+}
 function CVBar({ label, value, desc }) {
-  const pct = Math.min(100, value);
+  const pct = Math.min(100, cvValue(value) ?? 0);
+  const value_display = cvValue(value);
   const color = pct <= 20 ? "var(--green)" : pct <= 50 ? "var(--amber)" : "var(--red)";
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
         <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>{label}</span>
-        <span style={{ fontSize: 13, fontWeight: 700, color, fontFamily: "var(--font-mono)" }}>{value}</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color, fontFamily: "var(--font-mono)" }}>{value_display != null ? Math.round(value_display) : "—"}</span>
       </div>
       <div style={{ height: 6, background: "var(--border)", borderRadius: 3, overflow: "hidden" }}>
         <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 3, transition: "width 0.5s" }} />
@@ -535,14 +591,15 @@ function CVBar({ label, value, desc }) {
 }
 
 function CVMetricRow({ label, value, max }) {
-  const pct = (value / (max || 100)) * 100;
+  const num = cvValue(value);
+  const pct = num != null ? (num / (max || 100)) * 100 : 0;
   const color = pct <= 20 ? "var(--green)" : pct <= 50 ? "var(--amber)" : "var(--red)";
   return (
     <div style={{
       padding: "10px 12px", background: "var(--bg)", borderRadius: 7, border: "1px solid var(--border)",
     }}>
       <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 18, fontWeight: 700, color, fontFamily: "var(--font-display)" }}>{value}</div>
+      <div style={{ fontSize: 18, fontWeight: 700, color, fontFamily: "var(--font-display)" }}>{num != null ? Math.round(num) : "—"}</div>
     </div>
   );
 }
