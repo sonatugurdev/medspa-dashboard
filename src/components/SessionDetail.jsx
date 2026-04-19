@@ -114,7 +114,7 @@ export default function SessionDetail({ session, detail, loading }) {
 
           {/* Tab content */}
           {tab === "overview" && <OverviewTab analysis={analysis} clinical={clinical} patient={patient} session={detail.session} />}
-          {tab === "skin_analysis" && <SkinAnalysisTab cv={cv} concerns={detail.concerns || []} />}
+          {tab === "skin_analysis" && <SkinAnalysisTab cv={cv} concerns={detail.concerns || []} maskUrls={analysis.mask_urls || {}} />}
           {tab === "clinical" && <ClinicalTab clinical={clinical} />}
           {tab === "treatment" && <TreatmentTab analysis={analysis} concerns={detail.concerns || []} />}
           {tab === "intake" && <IntakeTab patient={patient} session={detail.session} skinProfile={detail.session?.skin_profile} />}
@@ -260,32 +260,67 @@ function OverviewTab({ analysis, clinical, patient, session }) {
 }
 
 // ── Skin Analysis Tab ──
-function SkinAnalysisTab({ cv, concerns }) {
+function SkinAnalysisTab({ cv, concerns, maskUrls }) {
+  const [activeMask, setActiveMask] = useState(null);
+
+  const masks = CV_METRICS
+    .map(m => ({ ...m, url: (maskUrls[m.key] || [])[0] }))
+    .filter(m => m.url);
+
+  // Auto-select first mask
+  const selectedMask = activeMask || (masks[0]?.key ?? null);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* CV Scores detail */}
-      {Object.keys(cv).length > 0 && (
-        <SectionCard title="MakeupAR HD Analysis">
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {CV_METRICS.map(m => {
-              const val = cv[m.key];
-              if (val == null) return null;
-              return <CVBar key={m.key} label={m.label} value={val} desc={m.desc} />;
+
+      {/* Mask overlays */}
+      {masks.length > 0 && (
+        <SectionCard title="Zone Analysis Overlays">
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            {masks.map(m => {
+              const val = cvValue(cv[m.key]);
+              const isActive = selectedMask === m.key;
+              const color = val == null ? "var(--text-muted)" : val >= 80 ? "var(--green)" : val >= 55 ? "var(--amber)" : "var(--red)";
+              return (
+                <button key={m.key} onClick={() => setActiveMask(m.key)} style={{
+                  flex: 1, padding: "8px 6px", borderRadius: 7, cursor: "pointer",
+                  border: `2px solid ${isActive ? color : "var(--border)"}`,
+                  background: isActive ? `${color}12` : "var(--bg)",
+                  fontFamily: "var(--font-body)", transition: "all 0.12s",
+                }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: isActive ? color : "var(--text-muted)", marginBottom: 2 }}>{m.label}</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color }}>{val != null ? Math.round(val) : "—"}</div>
+                </button>
+              );
             })}
           </div>
+          {masks.map(m => m.key === selectedMask && (
+            <div key={m.key} style={{ borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)" }}>
+              <img src={m.url} alt={m.label + " overlay"} style={{ width: "100%", display: "block" }} />
+              <div style={{ padding: "8px 12px", background: "var(--bg)", fontSize: 11.5, color: "var(--text-muted)" }}>
+                {m.desc} · MakeupAR HD overlay
+              </div>
+            </div>
+          ))}
         </SectionCard>
       )}
 
-      {/* Concerns list */}
+      {/* Concerns */}
       {concerns.length > 0 && (
-        <SectionCard title={`Identified Concerns (${concerns.length})`}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {concerns.map((c, i) => <ConcernCard key={i} concern={c} />)}
+        <SectionCard title={`Patient Concerns (${concerns.length})`}>
+          <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+            {concerns.map((c, i) => (
+              <span key={i} style={{
+                padding: "5px 12px", borderRadius: 6, fontSize: 13, fontWeight: 500,
+                background: "var(--teal-subtle)", color: "var(--teal)",
+                border: "1px solid var(--teal)",
+              }}>{c.label || c.name || c.concern_label || c.key}</span>
+            ))}
           </div>
         </SectionCard>
       )}
 
-      {concerns.length === 0 && Object.keys(cv).length === 0 && (
+      {masks.length === 0 && concerns.length === 0 && (
         <EmptyState message="No skin analysis data for this session." />
       )}
     </div>
