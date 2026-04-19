@@ -201,8 +201,8 @@ function OverviewTab({ analysis, clinical, patient, session }) {
       {/* Classifications */}
       <SectionCard title="Skin Classification">
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
-          <ClassRow label="Fitzpatrick" value={clinical.fitzpatrick_type ? `Type ${clinical.fitzpatrick_type}` : "—"} desc={FITZPATRICK_DESC[clinical.fitzpatrick_type] || ""} />
-          <ClassRow label="Glogau" value={clinical.glogau_class ? `Class ${clinical.glogau_class}` : "—"} desc={GLOGAU_DESC[clinical.glogau_class] || ""} />
+          <ClassRow label="Fitzpatrick" value={clinical.fitzpatrick_type ? `Type ${toRoman(clinical.fitzpatrick_type)}` : "—"} desc={FITZPATRICK_DESC[toRoman(clinical.fitzpatrick_type)] || ""} />
+          <ClassRow label="Glogau" value={clinical.glogau_class ? `Class ${clinical.glogau_class}` : (clinical.glogau_description ? "See desc." : "—")} desc={GLOGAU_DESC[clinical.glogau_class] || clinical.glogau_description || ""} />
           <ClassRow label="Skin Type" value={patient.skin_type || "—"} />
           <ClassRow label="Sensitivity" value={patient.sensitivity || "—"} />
         </div>
@@ -210,7 +210,7 @@ function OverviewTab({ analysis, clinical, patient, session }) {
 
       {/* CV Score summary */}
       {Object.keys(cv).length > 0 && (
-        <SectionCard title="CV Quantitative Scores">
+        <SectionCard title="Skin Health Scores">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
             {CV_METRICS.map(m => {
               const val = cv[m.key];
@@ -219,7 +219,7 @@ function OverviewTab({ analysis, clinical, patient, session }) {
             })}
           </div>
           <div style={{ marginTop: 10, padding: "10px 12px", background: "var(--bg)", borderRadius: 7, fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.6 }}>
-            CV scoring by MakeupAR HD Skin Analysis. Scale: 0 = none, 100 = severe.
+            MakeupAR HD Analysis · Higher score = healthier skin (0–100)
           </div>
         </SectionCard>
       )}
@@ -575,7 +575,8 @@ function cvValue(v) {
 function CVBar({ label, value, desc }) {
   const pct = Math.min(100, cvValue(value) ?? 0);
   const value_display = cvValue(value);
-  const color = pct <= 20 ? "var(--green)" : pct <= 50 ? "var(--amber)" : "var(--red)";
+  // MakeupAR ui_score: higher = healthier skin, so green at top, red at bottom
+  const color = pct >= 80 ? "var(--green)" : pct >= 55 ? "var(--amber)" : "var(--red)";
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
@@ -593,7 +594,8 @@ function CVBar({ label, value, desc }) {
 function CVMetricRow({ label, value, max }) {
   const num = cvValue(value);
   const pct = num != null ? (num / (max || 100)) * 100 : 0;
-  const color = pct <= 20 ? "var(--green)" : pct <= 50 ? "var(--amber)" : "var(--red)";
+  // MakeupAR ui_score: higher = healthier
+  const color = pct >= 80 ? "var(--green)" : pct >= 55 ? "var(--amber)" : "var(--red)";
   return (
     <div style={{
       padding: "10px 12px", background: "var(--bg)", borderRadius: 7, border: "1px solid var(--border)",
@@ -746,6 +748,12 @@ const CV_METRICS = [
   { key: "hd_age_spot", label: "Age Spots", max: 100, desc: "Hyperpigmentation / age spot coverage" },
 ];
 
+
+const FITZPATRICK_ROMAN = { 1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI" };
+function toRoman(v) {
+  if (!v && v !== 0) return null;
+  return FITZPATRICK_ROMAN[parseInt(v)] || String(v);
+}
 const FITZPATRICK_DESC = {
   "I": "Always burns, never tans",
   "II": "Usually burns, tans minimally",
