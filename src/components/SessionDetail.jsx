@@ -328,48 +328,103 @@ function SkinAnalysisTab({ cv, concerns, maskUrls }) {
 }
 
 // ── Clinical Intel Tab ──
+const CATEGORY_LABELS = {
+  volume_loss: "Volume Loss",
+  skin_laxity: "Skin Laxity",
+  texture: "Skin Texture",
+  tone_evenness: "Tone & Evenness",
+  hydration: "Hydration",
+  redness_vascular: "Redness / Vascular",
+  firmness: "Firmness",
+  radiance: "Radiance",
+  dark_circles: "Dark Circles",
+  eye_bags: "Eye Bags",
+  skin_quality: "Overall Skin Quality",
+};
+
+const SEV_STYLE = {
+  none:     { bg: "var(--green-subtle)",  fg: "var(--green)" },
+  mild:     { bg: "var(--teal-subtle)",   fg: "var(--teal)" },
+  moderate: { bg: "var(--amber-subtle)",  fg: "var(--amber)" },
+  severe:   { bg: "var(--red-subtle)",    fg: "var(--red)" },
+};
+
 function ClinicalTab({ clinical }) {
-  if (!clinical || Object.keys(clinical).length === 0) {
-    return <EmptyState message="No clinical analysis data available." />;
+  // clinical is an array of {category, zone, severity, description, confidence}
+  const observations = Array.isArray(clinical) ? clinical : [];
+  const active = observations.filter(o => o.severity && o.severity !== "none");
+
+  if (active.length === 0) {
+    return <EmptyState message="No clinical observations recorded for this session." />;
   }
 
-  const sections = [
-    { key: "volume_loss", label: "Volume Loss" },
-    { key: "laxity_assessment", label: "Skin Laxity" },
-    { key: "texture_analysis", label: "Texture Analysis" },
-    { key: "vascular_assessment", label: "Vascular / Pigmentation" },
-    { key: "overall_observations", label: "Overall Clinical Observations" },
-    { key: "treatment_considerations", label: "Treatment Considerations" },
-    { key: "contraindications", label: "Contraindications / Cautions" },
-  ];
+  const sevOrder = ["severe", "moderate", "mild"];
+  const sorted = [...active].sort((a, b) => {
+    const ai = sevOrder.indexOf(a.severity), bi = sevOrder.indexOf(b.severity);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {sections.map(s => {
-        const val = clinical[s.key];
-        if (!val) return null;
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {/* Severity summary strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 4 }}>
+        {sevOrder.map(sev => {
+          const count = active.filter(o => o.severity === sev).length;
+          const s = SEV_STYLE[sev] || SEV_STYLE.mild;
+          return (
+            <div key={sev} style={{ padding: "10px 14px", borderRadius: 8, background: s.bg, border: `1px solid ${s.fg}30`, textAlign: "center" }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: s.fg, fontFamily: "var(--font-display)" }}>{count}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: s.fg, textTransform: "capitalize", letterSpacing: "0.05em" }}>{sev}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Observation cards */}
+      {sorted.map((obs, i) => {
+        const sev = obs.severity || "mild";
+        const s = SEV_STYLE[sev] || SEV_STYLE.mild;
+        const label = CATEGORY_LABELS[obs.category] || (obs.category || "Observation").replace(/_/g, " ");
+        const confidence = obs.confidence != null ? Math.round(obs.confidence * 100) : null;
         return (
-          <SectionCard key={s.key} title={s.label}>
-            {typeof val === "string" ? (
-              <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.75, margin: 0 }}>{val}</p>
-            ) : Array.isArray(val) ? (
-              <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                {val.map((item, i) => (
-                  <li key={i} style={{ fontSize: 13, color: "var(--text-secondary)", padding: "5px 0", borderBottom: i < val.length - 1 ? "1px solid var(--border)" : "none", display: "flex", gap: 8 }}>
-                    <span style={{ color: "var(--teal)", fontWeight: 700, flexShrink: 0 }}>·</span>
-                    {typeof item === "string" ? item : item.text || item.content || item.description || JSON.stringify(item)}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <pre style={{ fontSize: 12, color: "var(--text-secondary)", whiteSpace: "pre-wrap", margin: 0, fontFamily: "var(--font-mono)" }}>{JSON.stringify(val, null, 2)}</pre>
+          <div key={i} style={{
+            background: "var(--surface)", border: "1px solid var(--border)",
+            borderLeft: `4px solid ${s.fg}`,
+            borderRadius: 8, padding: "14px 16px",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: obs.description ? 8 : 0 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", flex: 1, textTransform: "capitalize" }}>{label}</span>
+              {obs.zone && (
+                <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 4, padding: "2px 7px" }}>
+                  {obs.zone}
+                </span>
+              )}
+              <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: s.bg, color: s.fg, textTransform: "capitalize" }}>
+                {sev}
+              </span>
+            </div>
+            {obs.description && (
+              <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.7, margin: 0, marginBottom: confidence ? 10 : 0 }}>
+                {obs.description}
+              </p>
             )}
-          </SectionCard>
+            {confidence != null && (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5, color: "var(--text-muted)", marginBottom: 3 }}>
+                  <span>AI Confidence</span><span>{confidence}%</span>
+                </div>
+                <div style={{ height: 3, background: "var(--border)", borderRadius: 2 }}>
+                  <div style={{ width: `${confidence}%`, height: "100%", background: s.fg, borderRadius: 2 }} />
+                </div>
+              </div>
+            )}
+          </div>
         );
       })}
     </div>
   );
 }
+
 
 // ── Treatment Plan Tab ──
 function TreatmentTab({ analysis, concerns }) {
