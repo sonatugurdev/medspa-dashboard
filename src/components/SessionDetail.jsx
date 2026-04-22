@@ -115,7 +115,7 @@ export default function SessionDetail({ session, detail, loading }) {
           {/* Tab content */}
           {tab === "overview" && <OverviewTab analysis={analysis} clinical={clinical} patient={patient} session={detail.session} />}
           {tab === "skin_analysis" && <SkinAnalysisTab cv={cv} concerns={detail.concerns || []} maskUrls={analysis.mask_urls || {}} />}
-          {tab === "clinical" && <ClinicalTab clinical={clinical} />}
+          {tab === "clinical" && <ClinicalTab clinical={clinical} analysis={analysis} />}
           {tab === "treatment" && <TreatmentTab analysis={analysis} concerns={detail.concerns || []} />}
           {tab === "intake" && <IntakeTab patient={patient} session={detail.session} skinProfile={detail.session?.skin_profile} />}
         </div>
@@ -369,78 +369,175 @@ const SEV_STYLE = {
   severe:   { bg: "var(--red-subtle)",    fg: "var(--red)" },
 };
 
-function ClinicalTab({ clinical }) {
-  // clinical is an array of {category, zone, severity, description, confidence}
-  const observations = Array.isArray(clinical) ? clinical : [];
-  const active = observations.filter(o => o.severity && o.severity !== "none");
-
-  if (active.length === 0) {
-    return <EmptyState message="No clinical observations recorded for this session." />;
-  }
+function ClinicalTab({ clinical, analysis }) {
+  // clinical_observations lives at analysis.clinical (array) OR analysis.clinical_observations
+  const rawObs = Array.isArray(analysis.clinical)
+    ? analysis.clinical
+    : Array.isArray(analysis.clinical_observations)
+      ? analysis.clinical_observations
+      : [];
+  const observations = rawObs.filter(o => o.severity && o.severity !== "none");
 
   const sevOrder = ["severe", "moderate", "mild"];
-  const sorted = [...active].sort((a, b) => {
+  const sorted = [...observations].sort((a, b) => {
     const ai = sevOrder.indexOf(a.severity), bi = sevOrder.indexOf(b.severity);
     return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
   });
 
+  const contraindications = Array.isArray(analysis.contraindications) ? analysis.contraindications : [];
+  const strengths = Array.isArray(analysis.strengths) ? analysis.strengths : [];
+  const improvements = Array.isArray(analysis.improvements) ? analysis.improvements : [];
+  const crossView = Array.isArray(analysis.cross_view_observations) ? analysis.cross_view_observations : [];
+
+  const hasContent = observations.length > 0 || contraindications.length > 0 || strengths.length > 0 || crossView.length > 0;
+  if (!hasContent) {
+    return <EmptyState message="No clinical observations recorded for this session." />;
+  }
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {/* Severity summary strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 4 }}>
-        {sevOrder.map(sev => {
-          const count = active.filter(o => o.severity === sev).length;
-          const s = SEV_STYLE[sev] || SEV_STYLE.mild;
-          return (
-            <div key={sev} style={{ padding: "10px 14px", borderRadius: 8, background: s.bg, border: `1px solid ${s.fg}30`, textAlign: "center" }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color: s.fg, fontFamily: "var(--font-display)" }}>{count}</div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: s.fg, textTransform: "capitalize", letterSpacing: "0.05em" }}>{sev}</div>
-            </div>
-          );
-        })}
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+      {/* ── Pre-visit baseline strip ── */}
+      <div style={{
+        background: "var(--teal-subtle)", border: "1px solid var(--teal)30",
+        borderRadius: 10, padding: "12px 16px",
+        display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap",
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: "0.08em", flex: "0 0 auto" }}>
+          Pre-Visit Baseline
+        </div>
+        {[
+          { label: "Fitzpatrick", value: clinical.fitzpatrick_type ? `Type ${toRoman(clinical.fitzpatrick_type)}` : null, desc: FITZPATRICK_DESC[toRoman(clinical.fitzpatrick_type)] },
+          { label: "Glogau", value: clinical.glogau_class ? `Class ${clinical.glogau_class}` : null, desc: GLOGAU_DESC[clinical.glogau_class] || clinical.glogau_description },
+          { label: "Skin Age", value: analysis.skin_age ? `${analysis.skin_age}` : null, desc: "estimated" },
+        ].filter(r => r.value).map((r, i) => (
+          <div key={i} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>{r.label}</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>{r.value}</div>
+            {r.desc && <div style={{ fontSize: 10.5, color: "var(--text-muted)" }}>{r.desc}</div>}
+          </div>
+        ))}
       </div>
 
-      {/* Observation cards */}
-      {sorted.map((obs, i) => {
-        const sev = obs.severity || "mild";
-        const s = SEV_STYLE[sev] || SEV_STYLE.mild;
-        const label = CATEGORY_LABELS[obs.category] || (obs.category || "Observation").replace(/_/g, " ");
-        const confidence = obs.confidence != null ? Math.round(obs.confidence * 100) : null;
-        return (
-          <div key={i} style={{
-            background: "var(--surface)", border: "1px solid var(--border)",
-            borderLeft: `4px solid ${s.fg}`,
-            borderRadius: 8, padding: "14px 16px",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: obs.description ? 8 : 0 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", flex: 1, textTransform: "capitalize" }}>{label}</span>
-              {obs.zone && (
-                <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 4, padding: "2px 7px" }}>
-                  {obs.zone}
-                </span>
-              )}
-              <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: s.bg, color: s.fg, textTransform: "capitalize" }}>
-                {sev}
-              </span>
-            </div>
-            {obs.description && (
-              <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.7, margin: 0, marginBottom: confidence ? 10 : 0 }}>
-                {obs.description}
-              </p>
-            )}
-            {confidence != null && (
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5, color: "var(--text-muted)", marginBottom: 3 }}>
-                  <span>AI Confidence</span><span>{confidence}%</span>
-                </div>
-                <div style={{ height: 3, background: "var(--border)", borderRadius: 2 }}>
-                  <div style={{ width: `${confidence}%`, height: "100%", background: s.fg, borderRadius: 2 }} />
-                </div>
-              </div>
-            )}
+      {/* ── Contraindication flags ── */}
+      {contraindications.length > 0 && (
+        <div style={{ background: "#FFF0EE", border: "1px solid var(--red)40", borderRadius: 10, padding: "12px 16px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--red)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+            ⚠ Contraindication Flags
           </div>
-        );
-      })}
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {contraindications.map((c, i) => (
+              <div key={i} style={{ fontSize: 13, color: "#8B2020", lineHeight: 1.5 }}>
+                {typeof c === "string" ? `• ${c}` : `• ${c.flag || c.reason || JSON.stringify(c)}`}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Severity summary ── */}
+      {observations.length > 0 && (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+            {sevOrder.map(sev => {
+              const count = observations.filter(o => o.severity === sev).length;
+              const s = SEV_STYLE[sev] || SEV_STYLE.mild;
+              return (
+                <div key={sev} style={{ padding: "10px 14px", borderRadius: 8, background: s.bg, border: `1px solid ${s.fg}30`, textAlign: "center" }}>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: s.fg, fontFamily: "var(--font-display)" }}>{count}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: s.fg, textTransform: "capitalize", letterSpacing: "0.05em" }}>{sev}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Observation cards */}
+          {sorted.map((obs, i) => {
+            const sev = obs.severity || "mild";
+            const s = SEV_STYLE[sev] || SEV_STYLE.mild;
+            const label = CATEGORY_LABELS[obs.category] || (obs.category || "Observation").replace(/_/g, " ");
+            const confidence = obs.confidence != null ? Math.round(obs.confidence * 100) : null;
+            return (
+              <div key={i} style={{
+                background: "var(--surface)", border: "1px solid var(--border)",
+                borderLeft: `4px solid ${s.fg}`, borderRadius: 8, padding: "14px 16px",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: obs.description ? 8 : 0 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", flex: 1, textTransform: "capitalize" }}>{label}</span>
+                  {obs.zone && (
+                    <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 4, padding: "2px 7px" }}>
+                      {obs.zone}
+                    </span>
+                  )}
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: s.bg, color: s.fg, textTransform: "capitalize" }}>
+                    {sev}
+                  </span>
+                </div>
+                {obs.description && (
+                  <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.7, margin: 0, marginBottom: confidence ? 10 : 0 }}>
+                    {obs.description}
+                  </p>
+                )}
+                {confidence != null && (
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5, color: "var(--text-muted)", marginBottom: 3 }}>
+                      <span>AI Confidence</span><span>{confidence}%</span>
+                    </div>
+                    <div style={{ height: 3, background: "var(--border)", borderRadius: 2 }}>
+                      <div style={{ width: `${confidence}%`, height: "100%", background: s.fg, borderRadius: 2 }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </>
+      )}
+
+      {/* ── Strengths ── */}
+      {strengths.length > 0 && (
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 16px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+            Skin Strengths
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            {strengths.map((s, i) => (
+              <div key={i} style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>✓ {s}</div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Areas for improvement ── */}
+      {improvements.length > 0 && (
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 16px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--amber)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+            Areas for Improvement
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            {improvements.map((s, i) => (
+              <div key={i} style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>→ {s}</div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Cross-view notes ── */}
+      {crossView.length > 0 && (
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderLeft: "4px solid var(--text-muted)", borderRadius: 10, padding: "12px 16px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+            Recommend In-Person Assessment
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            {crossView.map((s, i) => (
+              <div key={i} style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                {typeof s === "string" ? `• ${s}` : `• ${s.observation || s.note || JSON.stringify(s)}`}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -450,10 +547,8 @@ function ClinicalTab({ clinical }) {
 function TreatmentTab({ analysis, concerns }) {
   const recs = analysis.treatment_recommendations || [];
   const contras = analysis.contraindications || [];
-  const homecare = analysis.homecare_recommendations || [];
-  const inClinic = analysis.in_clinic_recommendations || [];
 
-  if (!recs.length && !contras.length && !homecare.length && !inClinic.length && !concerns.length) {
+  if (!recs.length && !contras.length && !concerns.length) {
     return <EmptyState message="No treatment recommendations available." />;
   }
 
@@ -526,29 +621,6 @@ function TreatmentTab({ analysis, concerns }) {
         </SectionCard>
       )}
 
-      {homecare.length > 0 && (
-        <SectionCard title="☀️ Home Care Protocol">
-          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-            {homecare.map((item, i) => (
-              <li key={i} style={{ fontSize: 13, color: "var(--text-secondary)", padding: "6px 0", borderBottom: i < homecare.length - 1 ? "1px solid var(--border)" : "none", display: "flex", gap: 8 }}>
-                <span style={{ color: "var(--teal)", fontWeight: 700 }}>·</span>{typeof item === "string" ? item : item.text || item.recommendation || JSON.stringify(item)}
-              </li>
-            ))}
-          </ul>
-        </SectionCard>
-      )}
-
-      {inClinic.length > 0 && (
-        <SectionCard title="✨ In-Clinic Treatments">
-          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-            {inClinic.map((item, i) => (
-              <li key={i} style={{ fontSize: 13, color: "var(--text-secondary)", padding: "6px 0", borderBottom: i < inClinic.length - 1 ? "1px solid var(--border)" : "none", display: "flex", gap: 8 }}>
-                <span style={{ color: "var(--teal)", fontWeight: 700 }}>·</span>{typeof item === "string" ? item : item.text || item.recommendation || JSON.stringify(item)}
-              </li>
-            ))}
-          </ul>
-        </SectionCard>
-      )}
     </div>
   );
 }
