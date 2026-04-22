@@ -296,7 +296,27 @@ function SkinAnalysisTab({ cv, concerns, maskUrls }) {
           </div>
           {masks.map(m => m.key === selectedMask && (
             <div key={m.key} style={{ borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)" }}>
-              <img src={m.url} alt={m.label + " overlay"} style={{ width: "100%", display: "block" }} />
+              <div style={{
+                background: "var(--surface)",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                maxHeight: 420,
+                padding: "0 16px",
+              }}>
+                <img
+                  src={m.url}
+                  alt={m.label + " overlay"}
+                  style={{
+                    maxHeight: 420,
+                    width: "auto",
+                    maxWidth: "100%",
+                    display: "block",
+                    objectFit: "contain",
+                    borderRadius: 6,
+                  }}
+                />
+              </div>
               <div style={{ padding: "8px 12px", background: "var(--bg)", fontSize: 11.5, color: "var(--text-muted)" }}>
                 {m.desc} · MakeupAR HD overlay
               </div>
