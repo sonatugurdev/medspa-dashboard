@@ -6,7 +6,7 @@
   --teal-dark: #085F6D;
   --teal-subtle: #EAF5F6;
 
-  /* Neutrals — cool off-white base */
+  /* Neutrals â€” cool off-white base */
   --bg: #F5F6F8;
   --surface: #FFFFFF;
   --border: #E4E7EC;
@@ -90,4 +90,8 @@ body::before {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
   pointer-events: none;
   z-index: 9999;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

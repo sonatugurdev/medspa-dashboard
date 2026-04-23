@@ -4,12 +4,13 @@ import PatientList from "../components/PatientList";
 import SessionDetail from "../components/SessionDetail";
 import OverviewPanel from "../components/OverviewPanel";
 import ProgressPage from "../components/ProgressPage";
+import SettingsPage from "../components/SettingsPage";
 
 export default function Dashboard({ onUnauth }) {
   const { apiKey, logout } = useAuth();
   const client = apiClient(apiKey);
 
-  const [screen, setScreen] = useState("overview"); // "overview" | "patient" | "session"
+  const [screen, setScreen] = useState("overview"); // "overview" | "patients" | "patient" | "session" | "progress" | "settings"
   const [patients, setPatients] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [selectedSession, setSelectedSession] = useState(null);
@@ -111,8 +112,9 @@ export default function Dashboard({ onUnauth }) {
         <nav style={{ padding: "12px 10px", flex: 1, overflowY: "auto" }}>
           <SideNavSection label="Practice">
             <NavItem icon={<HomeIcon />} label="Overview" active={screen === "overview"} onClick={() => { setScreen("overview"); setSelectedPatient(null); setSelectedSession(null); }} />
-            <NavItem icon={<PatientsIcon />} label="Patients" active={["patient","session"].includes(screen)} onClick={() => { setScreen("overview"); }} badge={patients.length || null} />
+            <NavItem icon={<PatientsIcon />} label="Patients" active={["patients","patient","session"].includes(screen)} onClick={() => { setScreen("patients"); setSelectedPatient(null); setSelectedSession(null); }} badge={patients.length || null} />
             <NavItem icon={<ProgressIcon />} label="Progress" active={screen === "progress"} onClick={() => { setScreen("progress"); setSelectedPatient(null); setSelectedSession(null); }} />
+            <NavItem icon={<SettingsIcon />} label="Settings" active={screen === "settings"} onClick={() => { setScreen("settings"); setSelectedPatient(null); setSelectedSession(null); }} />
           </SideNavSection>
 
           {selectedPatient && (
@@ -170,7 +172,7 @@ export default function Dashboard({ onUnauth }) {
           <Breadcrumb screen={screen} patient={selectedPatient} session={selectedSession} />
           <div style={{ flex: 1 }} />
           {/* Search — only show on patient list */}
-          {(screen === "overview") && (
+          {(screen === "overview" || screen === "patients") && (
             <div style={{ position: "relative" }}>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }}>
                 <circle cx="6" cy="6" r="4"/><path d="M12 12l-2.5-2.5"/>
@@ -207,6 +209,16 @@ export default function Dashboard({ onUnauth }) {
             />
           )}
 
+          {screen === "patients" && (
+            <OverviewPanel
+              patients={filteredPatients}
+              loading={loadingPatients}
+              onSelectPatient={handleSelectPatient}
+              search={search}
+              patientsOnly
+            />
+          )}
+
           {screen === "patient" && selectedPatient && (
             <PatientList
               patient={selectedPatient}
@@ -224,6 +236,9 @@ export default function Dashboard({ onUnauth }) {
           )}
           {screen === "progress" && (
             <ProgressPage />
+          )}
+          {screen === "settings" && (
+            <SettingsPage onUnauth={() => { logout(); onUnauth(); }} />
           )}
         </main>
       </div>
@@ -273,7 +288,7 @@ function NavItem({ icon, label, active, onClick, badge, indent }) {
 }
 
 function Breadcrumb({ screen, patient, session }) {
-  const parts = ["Patients"];
+  const parts = screen === "overview" ? ["Overview"] : ["Patients"];
   if (patient) parts.push(patient.name);
   if (session) parts.push(`Scan · ${formatDate(session.created_at)}`);
   return (
@@ -325,5 +340,12 @@ const ProgressIcon = () => (
   <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="1.5,10 4.5,6 7,8 11.5,3"/>
     <path d="M9.5 3h2v2"/>
+  </svg>
+);
+
+const SettingsIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="6.5" cy="6.5" r="1.8"/>
+    <path d="M6.5 1v1.2M6.5 10.8V12M1 6.5h1.2M10.8 6.5H12M2.7 2.7l.85.85M9.45 9.45l.85.85M2.7 10.3l.85-.85M9.45 3.55l.85-.85"/>
   </svg>
 );
