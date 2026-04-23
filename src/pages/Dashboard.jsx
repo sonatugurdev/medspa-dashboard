@@ -3,6 +3,7 @@ import { useAuth, apiClient } from "../lib/auth";
 import PatientList from "../components/PatientList";
 import SessionDetail from "../components/SessionDetail";
 import OverviewPanel from "../components/OverviewPanel";
+import ProgressPage from "../components/ProgressPage";
 
 export default function Dashboard({ onUnauth }) {
   const { apiKey, logout } = useAuth();
@@ -111,6 +112,7 @@ export default function Dashboard({ onUnauth }) {
           <SideNavSection label="Practice">
             <NavItem icon={<HomeIcon />} label="Overview" active={screen === "overview"} onClick={() => { setScreen("overview"); setSelectedPatient(null); setSelectedSession(null); }} />
             <NavItem icon={<PatientsIcon />} label="Patients" active={["patient","session"].includes(screen)} onClick={() => { setScreen("overview"); }} badge={patients.length || null} />
+            <NavItem icon={<ProgressIcon />} label="Progress" active={screen === "progress"} onClick={() => { setScreen("progress"); setSelectedPatient(null); setSelectedSession(null); }} />
           </SideNavSection>
 
           {selectedPatient && (
@@ -220,6 +222,9 @@ export default function Dashboard({ onUnauth }) {
               loading={loadingSession}
             />
           )}
+          {screen === "progress" && (
+            <ProgressPage />
+          )}
         </main>
       </div>
     </div>
@@ -313,5 +318,12 @@ const ScanIcon = () => (
   <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
     <rect x="1" y="1" width="11" height="11" rx="2"/>
     <path d="M4 6.5h5M6.5 4v5"/>
+  </svg>
+);
+
+const ProgressIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="1.5,10 4.5,6 7,8 11.5,3"/>
+    <path d="M9.5 3h2v2"/>
   </svg>
 );
