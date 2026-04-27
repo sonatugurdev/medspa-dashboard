@@ -103,7 +103,7 @@ export default function Dashboard({ onUnauth }) {
             </svg>
           </div>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.3px", fontFamily: "var(--font-display)", lineHeight: 1 }}>Lucida</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.3px", fontFamily: "var(--font-display)", lineHeight: 1 }}>Endless Youth Medspa</div>
             <div style={{ fontSize: 9.5, fontWeight: 600, color: "var(--text-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 1 }}>Clinical Intelligence</div>
           </div>
         </div>

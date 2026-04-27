@@ -76,13 +76,13 @@ export default function Login() {
               </svg>
             </div>
             <span style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.5px", fontFamily: "var(--font-display)" }}>
-              Lucida
+              Endless Youth
             </span>
             <span style={{
               fontSize: 10, fontWeight: 600, letterSpacing: "0.08em",
               background: "var(--teal-subtle)", color: "var(--teal)",
               padding: "3px 7px", borderRadius: 4, textTransform: "uppercase"
-            }}>Clinical</span>
+            }}>Medspa</span>
           </div>
           <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 10, lineHeight: 1.5 }}>
             Practitioner dashboard · Sign in with your API key
@@ -132,7 +132,7 @@ export default function Login() {
         </form>
 
         <p style={{ marginTop: 24, fontSize: 11.5, color: "var(--text-muted)", textAlign: "center", lineHeight: 1.6 }}>
-          Protected by Lucida Clinical Auth.<br/>Keys are session-only and never stored.
+          Protected by Glowa AI Auth.<br/>Keys are session-only and never stored.
         </p>
       </div>
     </div>
