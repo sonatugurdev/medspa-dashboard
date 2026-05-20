@@ -76,7 +76,7 @@ export default function Login() {
               </svg>
             </div>
             <span style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.5px", fontFamily: "var(--font-display)" }}>
-              Endless Youth
+              Glowa
             </span>
             <span style={{
               fontSize: 10, fontWeight: 600, letterSpacing: "0.08em",

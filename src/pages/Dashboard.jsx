@@ -5,12 +5,13 @@ import SessionDetail from "../components/SessionDetail";
 import OverviewPanel from "../components/OverviewPanel";
 import ProgressPage from "../components/ProgressPage";
 import SettingsPage from "../components/SettingsPage";
+import IntegrationsPage from "../components/IntegrationsPage";
 
 export default function Dashboard({ onUnauth }) {
   const { apiKey, logout } = useAuth();
   const client = apiClient(apiKey);
 
-  const [screen, setScreen] = useState("overview"); // "overview" | "patients" | "patient" | "session" | "progress" | "settings"
+  const [screen, setScreen] = useState("overview"); // "overview" | "patients" | "patient" | "session" | "progress" | "settings" | "integrations"
   const [patients, setPatients] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [selectedSession, setSelectedSession] = useState(null);
@@ -103,7 +104,7 @@ export default function Dashboard({ onUnauth }) {
             </svg>
           </div>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.3px", fontFamily: "var(--font-display)", lineHeight: 1 }}>Endless Youth Medspa</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.3px", fontFamily: "var(--font-display)", lineHeight: 1 }}>Glowa</div>
             <div style={{ fontSize: 9.5, fontWeight: 600, color: "var(--text-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 1 }}>Clinical Intelligence</div>
           </div>
         </div>
@@ -115,6 +116,7 @@ export default function Dashboard({ onUnauth }) {
             <NavItem icon={<PatientsIcon />} label="Patients" active={["patients","patient","session"].includes(screen)} onClick={() => { setScreen("patients"); setSelectedPatient(null); setSelectedSession(null); }} badge={patients.length || null} />
             <NavItem icon={<ProgressIcon />} label="Progress" active={screen === "progress"} onClick={() => { setScreen("progress"); setSelectedPatient(null); setSelectedSession(null); }} />
             <NavItem icon={<SettingsIcon />} label="Settings" active={screen === "settings"} onClick={() => { setScreen("settings"); setSelectedPatient(null); setSelectedSession(null); }} />
+            <NavItem icon={<IntegrationsIcon />} label="Integrations" active={screen === "integrations"} onClick={() => { setScreen("integrations"); setSelectedPatient(null); setSelectedSession(null); }} />
           </SideNavSection>
 
           {selectedPatient && (
@@ -240,6 +242,9 @@ export default function Dashboard({ onUnauth }) {
           {screen === "settings" && (
             <SettingsPage onUnauth={() => { logout(); onUnauth(); }} />
           )}
+          {screen === "integrations" && (
+            <IntegrationsPage onUnauth={() => { logout(); onUnauth(); }} />
+          )}
         </main>
       </div>
     </div>
@@ -288,9 +293,13 @@ function NavItem({ icon, label, active, onClick, badge, indent }) {
 }
 
 function Breadcrumb({ screen, patient, session }) {
-  const parts = screen === "overview" ? ["Overview"] : ["Patients"];
-  if (patient) parts.push(patient.name);
-  if (session) parts.push(`Scan · ${formatDate(session.created_at)}`);
+  const parts = screen === "overview" ? ["Overview"]
+    : screen === "settings" ? ["Settings"]
+    : screen === "progress" ? ["Progress"]
+    : screen === "integrations" ? ["Integrations"]
+    : ["Patients"];
+  if (patient && !["settings", "progress", "integrations", "overview"].includes(screen)) parts.push(patient.name);
+  if (session && screen === "session") parts.push(`Scan · ${formatDate(session.created_at)}`);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text-muted)" }}>
       {parts.map((p, i) => (
@@ -347,5 +356,13 @@ const SettingsIcon = () => (
   <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="6.5" cy="6.5" r="1.8"/>
     <path d="M6.5 1v1.2M6.5 10.8V12M1 6.5h1.2M10.8 6.5H12M2.7 2.7l.85.85M9.45 9.45l.85.85M2.7 10.3l.85-.85M9.45 3.55l.85-.85"/>
+  </svg>
+);
+
+const IntegrationsIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 1.5v3M9 1.5v3"/>
+    <path d="M2 4.5h9v2a3 3 0 01-3 3H5a3 3 0 01-3-3v-2z"/>
+    <path d="M6.5 9.5v2"/>
   </svg>
 );

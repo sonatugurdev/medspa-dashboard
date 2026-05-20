@@ -4,7 +4,7 @@ export const AuthContext = createContext({ apiKey: "", login: () => {}, logout: 
 export const useAuth = () => useContext(AuthContext);
 
 const BASE = import.meta.env.VITE_API_BASE || "https://medspa-backend.onrender.com";
-export const PRACTICE_SLUG = import.meta.env.VITE_PRACTICE_SLUG || "default";
+export const PRACTICE_SLUG = import.meta.env.VITE_PRACTICE_SLUG || "demo-clinic";
 
 export function apiClient(apiKey) {
   const headers = {
@@ -38,6 +38,12 @@ export function apiClient(apiKey) {
       if (res.status === 401) throw new Error("UNAUTHORIZED");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
+    },
+    delete: async (path) => {
+      const res = await fetch(`${BASE}${path}`, { method: "DELETE", headers });
+      if (res.status === 401) throw new Error("UNAUTHORIZED");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.status === 204 ? null : res.json().catch(() => null);
     },
   };
 }
