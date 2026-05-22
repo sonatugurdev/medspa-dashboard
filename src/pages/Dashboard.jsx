@@ -9,6 +9,7 @@ import IntegrationsPage from "../components/IntegrationsPage";
 import MessagesPage from "../components/MessagesPage";
 import GlowaAcademyPage from "../components/GlowaAcademyPage";
 import GlowaMarketingPage from "../components/GlowaMarketingPage";
+import PatientsPage from "../components/PatientsPage";
 
 export default function Dashboard({ onUnauth }) {
   const { apiKey, logout } = useAuth();
@@ -188,7 +189,7 @@ export default function Dashboard({ onUnauth }) {
           <Breadcrumb screen={screen} patient={selectedPatient} session={selectedSession} />
           <div style={{ flex: 1 }} />
           {/* Search — only show on patient list */}
-          {(screen === "overview" || screen === "patients") && (
+          {screen === "overview" && (
             <div style={{ position: "relative" }}>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }}>
                 <circle cx="6" cy="6" r="4" /><path d="M12 12l-2.5-2.5" />
@@ -226,12 +227,12 @@ export default function Dashboard({ onUnauth }) {
           )}
 
           {screen === "patients" && (
-            <OverviewPanel
-              patients={filteredPatients}
+            <PatientsPage
+              patients={patients}
               loading={loadingPatients}
               onSelectPatient={handleSelectPatient}
               search={search}
-              patientsOnly
+              onSearchChange={setSearch}
             />
           )}
 
@@ -327,9 +328,10 @@ function Breadcrumb({ screen, patient, session }) {
     : screen === "settings" ? ["Settings"]
       : screen === "progress" ? ["Progress"]
         : screen === "integrations" ? ["Integrations"]
-          : screen === "academy" ? ["Grow", "Glowa Academy"]
-            : screen === "marketing" ? ["Grow", "Glowa Marketing"]
-              : ["Patients"];
+          : screen === "messages" ? ["Messages"]
+            : screen === "academy" ? ["Grow", "Glowa Academy"]
+              : screen === "marketing" ? ["Grow", "Glowa Marketing"]
+                : ["Patients"];
   if (patient && !["settings", "progress", "integrations", "overview", "academy", "marketing"].includes(screen)) parts.push(patient.name);
   if (session && screen === "session") parts.push(`Scan · ${formatDate(session.created_at)}`);
   return (

@@ -1,257 +1,300 @@
-import { useState } from "react";
-
-const URGENCY_COLORS = {
-  high: { bg: "var(--red-subtle)", fg: "var(--red)", dot: "var(--red)" },
-  medium: { bg: "var(--amber-subtle)", fg: "var(--amber)", dot: "var(--amber)" },
-  low: { bg: "var(--green-subtle)", fg: "var(--green)", dot: "var(--green)" },
-  preventive: { bg: "var(--teal-subtle)", fg: "var(--teal)", dot: "var(--teal)" },
-};
-
-const FITZPATRICK_LABELS = { I: "Very fair", II: "Fair", III: "Medium", IV: "Olive", V: "Brown", VI: "Dark" };
+import { useMemo } from "react";
 
 export default function OverviewPanel({ patients, loading, onSelectPatient, search }) {
-  const [sortBy, setSortBy] = useState("recent");
+  const data = useMemo(() => {
+    const total = patients.length;
+    const analyzed = patients.filter(p => p.latest_score != null).length;
+    const highPriority = patients.filter(p => p.latest_score != null && p.latest_score < 4.5).length;
+    const recentScans = patients.filter(p => {
+      if (!p.last_session_at) return false;
+      return (Date.now() - new Date(p.last_session_at)) / 86400000 <= 30;
+    }).length;
 
-  const sorted = [...patients].sort((a, b) => {
-    if (sortBy === "recent") return new Date(b.last_session_at || 0) - new Date(a.last_session_at || 0);
-    if (sortBy === "name") return a.name.localeCompare(b.name);
-    if (sortBy === "score") return (b.latest_score || 0) - (a.latest_score || 0);
-    return 0;
-  });
+    // Top concerns frequency
+    const concernMap = {};
+    patients.forEach(p => { if (p.top_concern) concernMap[p.top_concern] = (concernMap[p.top_concern] || 0) + 1; });
+    const topConcerns = Object.entries(concernMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
-  const totalPatients = patients.length;
-  const withAnalysis = patients.filter(p => p.latest_score != null).length;
-  const recentScans = patients.filter(p => {
-    if (!p.last_session_at) return false;
-    const days = (Date.now() - new Date(p.last_session_at)) / 86400000;
-    return days <= 30;
-  }).length;
+    // Score distribution buckets
+    const scoreBuckets = { "Excellent (8–10)": 0, "Good (6–8)": 0, "Fair (4–6)": 0, "Needs Attention (<4)": 0 };
+    patients.forEach(p => {
+      if (p.latest_score == null) return;
+      if (p.latest_score >= 8) scoreBuckets["Excellent (8–10)"]++;
+      else if (p.latest_score >= 6) scoreBuckets["Good (6–8)"]++;
+      else if (p.latest_score >= 4) scoreBuckets["Fair (4–6)"]++;
+      else scoreBuckets["Needs Attention (<4)"]++;
+    });
+
+    // Fitzpatrick distribution
+    const fitzMap = {};
+    patients.forEach(p => { if (p.fitzpatrick) fitzMap[p.fitzpatrick] = (fitzMap[p.fitzpatrick] || 0) + 1; });
+
+    // Priority patients: high score concern, most recent
+    const priority = [...patients]
+      .filter(p => p.latest_score != null)
+      .sort((a, b) => a.latest_score - b.latest_score)
+      .slice(0, 5);
+
+    // Avg score
+    const scored = patients.filter(p => p.latest_score != null);
+    const avgScore = scored.length ? (scored.reduce((s, p) => s + p.latest_score, 0) / scored.length).toFixed(1) : null;
+
+    // Unanalyzed
+    const unanalyzed = total - analyzed;
+
+    return { total, analyzed, highPriority, recentScans, topConcerns, scoreBuckets, fitzMap, priority, avgScore, unanalyzed };
+  }, [patients]);
+
+  const insights = useMemo(() => {
+    const list = [];
+    if (data.highPriority > 0) {
+      list.push({
+        type: "warn",
+        title: `${data.highPriority} patient${data.highPriority > 1 ? "s" : ""} need immediate attention`,
+        desc: `Skin scores below 4.5 — recommend scheduling follow-up consultations.`,
+        cta: "Review patients",
+      });
+    }
+    if (data.unanalyzed > 0) {
+      list.push({
+        type: "info",
+        title: `${data.unanalyzed} patient${data.unanalyzed > 1 ? "s" : ""} haven't been analyzed yet`,
+        desc: `Completing AI skin analysis could reveal treatment opportunities.`,
+        cta: "View unanalyzed",
+      });
+    }
+    if (data.topConcerns[0]) {
+      list.push({
+        type: "teal",
+        title: `"${data.topConcerns[0][0]}" is your most common patient concern`,
+        desc: `${data.topConcerns[0][1]} patient${data.topConcerns[0][1] > 1 ? "s" : ""} share this as their top skin concern. Consider featuring related treatments.`,
+        cta: "See breakdown",
+      });
+    }
+    while (list.length < 3) {
+      list.push({
+        type: "teal",
+        title: `Average skin score across practice: ${data.avgScore || "—"}`,
+        desc: `Based on ${data.analyzed} analyzed patients. Track this over time to measure treatment effectiveness.`,
+        cta: null,
+      });
+    }
+    return list.slice(0, 3);
+  }, [data]);
 
   return (
-    <div>
-      {/* Header */}
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.5px", fontFamily: "var(--font-display)", marginBottom: 4 }}>
-          Patient Intelligence
+    <div style={{ maxWidth: 1200 }}>
+      {/* Page header */}
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 28, fontWeight: 400, color: "var(--text-primary)", letterSpacing: "-0.02em", marginBottom: 4 }}>
+          Practice Overview
         </h1>
-        <p style={{ fontSize: 13.5, color: "var(--text-muted)", lineHeight: 1.5 }}>
-          Pre-visit skin analysis for {totalPatients} patient{totalPatients !== 1 ? "s" : ""}
-          {search && ` · Showing results for "${search}"`}
+        <p style={{ fontSize: 13.5, color: "var(--text-muted)" }}>
+          Patient intelligence across your full practice
+          {search && ` · Filtering for "${search}"`}
         </p>
       </div>
 
-      {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 28 }}>
-        <KPICard label="Total Patients" value={totalPatients} sub="In database" accent={false} />
-        <KPICard label="With AI Analysis" value={withAnalysis} sub="Skin scores available" accent={true} />
-        <KPICard label="Scans This Month" value={recentScans} sub="Last 30 days" accent={false} />
+      {/* KPI tiles */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24 }}>
+        <KPITile label="Total Patients" value={loading ? "—" : data.total} sub="In database" />
+        <KPITile label="AI Analyzed" value={loading ? "—" : data.analyzed} sub={`${data.total ? Math.round((data.analyzed / data.total) * 100) : 0}% of roster`} accent />
+        <KPITile label="High Priority" value={loading ? "—" : data.highPriority} sub="Score below 4.5" warn={data.highPriority > 0} />
+        <KPITile label="Scans This Month" value={loading ? "—" : data.recentScans} sub="Last 30 days" />
       </div>
 
-      {/* Patient table */}
-      <div style={{
-        background: "var(--surface)", border: "1px solid var(--border)",
-        borderRadius: 12, overflow: "hidden",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-      }}>
-        {/* Table header */}
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "16px 20px", borderBottom: "1px solid var(--border)",
-        }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
-            Patients {search && <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>({sorted.length} results)</span>}
-          </span>
-          <div style={{ display: "flex", gap: 6 }}>
-            {[["recent", "Recent"], ["name", "Name"], ["score", "Score"]].map(([val, label]) => (
-              <button key={val} onClick={() => setSortBy(val)} style={{
-                padding: "5px 10px", borderRadius: 6, fontSize: 11.5,
-                fontWeight: 500, cursor: "pointer",
-                border: `1px solid ${sortBy === val ? "var(--teal)" : "var(--border)"}`,
-                background: sortBy === val ? "var(--teal-subtle)" : "transparent",
-                color: sortBy === val ? "var(--teal)" : "var(--text-muted)",
-                fontFamily: "var(--font-body)",
-              }}>{label}</button>
-            ))}
+      {/* Insights row */}
+      {!loading && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 24 }}>
+          {insights.map((ins, i) => <InsightCard key={i} insight={ins} />)}
+        </div>
+      )}
+
+      {/* Two-column: priority list + analytics */}
+      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 20 }}>
+
+        {/* Priority patients */}
+        <div style={card}>
+          <div style={cardHead}>
+            <div>
+              <div style={cardTitle}>Patients needing attention</div>
+              <div style={cardSub}>Lowest skin scores — prioritized for follow-up.</div>
+            </div>
+            <button onClick={() => {}} style={linkBtn}>View all patients →</button>
           </div>
+
+          {loading ? (
+            <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>Loading…</div>
+          ) : data.priority.length === 0 ? (
+            <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>No analyzed patients yet.</div>
+          ) : data.priority.map((p, i) => (
+            <div key={p.id} onClick={() => onSelectPatient(p)} style={{
+              display: "grid", gridTemplateColumns: "36px 1fr auto auto",
+              alignItems: "center", gap: 12,
+              padding: "12px 18px",
+              borderBottom: i < data.priority.length - 1 ? "1px solid var(--border)" : "none",
+              cursor: "pointer",
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = "var(--bg)"}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+            >
+              <div style={{
+                width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+                background: `hsl(${(p.name.charCodeAt(0) * 7) % 360}, 40%, 88%)`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 11.5, fontWeight: 700,
+                color: `hsl(${(p.name.charCodeAt(0) * 7) % 360}, 50%, 30%)`,
+              }}>
+                {p.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+              </div>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--text-primary)" }}>{p.name}</div>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 1 }}>
+                  {p.top_concern || "No concern noted"}
+                  {p.last_session_at && ` · ${timeAgo(p.last_session_at)}`}
+                </div>
+              </div>
+              <UrgencyPill score={p.latest_score} />
+              <ScoreBadge score={p.latest_score} />
+            </div>
+          ))}
         </div>
 
-        {loading ? (
-          <div style={{ padding: "60px 20px", textAlign: "center" }}>
-            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Loading patients…</div>
+        {/* Analytics */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+          {/* Top concerns */}
+          <div style={card}>
+            <div style={cardHead}>
+              <div style={cardTitle}>Top patient concerns</div>
+            </div>
+            <div style={{ padding: "14px 18px" }}>
+              {data.topConcerns.length === 0 ? (
+                <div style={{ fontSize: 12.5, color: "var(--text-muted)" }}>No data yet.</div>
+              ) : data.topConcerns.map(([concern, count], i) => {
+                const max = data.topConcerns[0][1];
+                return (
+                  <div key={i} style={{ marginBottom: i < data.topConcerns.length - 1 ? 10 : 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 12.5 }}>
+                      <span style={{ color: "var(--text-secondary)", fontWeight: 500 }}>{concern}</span>
+                      <span style={{ color: "var(--text-muted)" }}>{count}</span>
+                    </div>
+                    <div style={{ background: "var(--bg)", height: 6, borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ width: `${(count / max) * 100}%`, height: "100%", background: "var(--teal)", borderRadius: 3 }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        ) : sorted.length === 0 ? (
-          <div style={{ padding: "60px 20px", textAlign: "center" }}>
-            <div style={{ fontSize: 28, marginBottom: 12 }}>🔍</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", marginBottom: 4 }}>No patients found</div>
-            <div style={{ fontSize: 12.5, color: "var(--text-muted)" }}>Try a different search term</div>
+
+          {/* Score distribution */}
+          <div style={card}>
+            <div style={cardHead}>
+              <div style={cardTitle}>Score distribution</div>
+            </div>
+            <div style={{ padding: "14px 18px" }}>
+              {Object.entries(data.scoreBuckets).map(([label, count], i, arr) => {
+                const colors = ["var(--green)", "var(--teal)", "var(--amber)", "var(--red)"];
+                const max = Math.max(...Object.values(data.scoreBuckets), 1);
+                return (
+                  <div key={label} style={{ marginBottom: i < arr.length - 1 ? 10 : 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 12.5 }}>
+                      <span style={{ color: "var(--text-secondary)", fontWeight: 500 }}>{label}</span>
+                      <span style={{ color: "var(--text-muted)" }}>{count}</span>
+                    </div>
+                    <div style={{ background: "var(--bg)", height: 6, borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ width: `${(count / max) * 100}%`, height: "100%", background: colors[i], borderRadius: 3 }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ background: "var(--bg)" }}>
-                {["Patient", "Fitzpatrick / Glogau", "Top Concern", "Skin Score", "Last Scan", "Sessions", ""].map((h, i) => (
-                  <th key={i} style={{
-                    padding: "10px 16px", textAlign: "left",
-                    fontSize: 10.5, fontWeight: 700,
-                    textTransform: "uppercase", letterSpacing: "0.07em",
-                    color: "var(--text-muted)",
-                    borderBottom: "1px solid var(--border)",
-                  }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((p, i) => (
-                <PatientRow key={p.id} patient={p} even={i % 2 === 0} onClick={() => onSelectPatient(p)} />
-              ))}
-            </tbody>
-          </table>
-        )}
+
+        </div>
       </div>
     </div>
   );
 }
 
-function PatientRow({ patient: p, even, onClick }) {
-  const scoreColor = p.latest_score >= 7.5 ? "var(--green)" : p.latest_score >= 5.5 ? "var(--teal)" : p.latest_score >= 4 ? "var(--amber)" : "var(--red)";
-  const fitz = p.fitzpatrick || "—";
-  const glogau = p.glogau || "—";
-
+function InsightCard({ insight }) {
+  const colors = {
+    warn: { bg: "var(--amber-subtle)", border: "#f5d9a0", dot: "var(--amber)", text: "var(--amber)" },
+    info: { bg: "#e5edfb", border: "#c9d8f3", dot: "#2a6fdb", text: "#2a6fdb" },
+    teal: { bg: "var(--teal-subtle)", border: "#b3d8db", dot: "var(--teal)", text: "var(--teal)" },
+  };
+  const c = colors[insight.type];
   return (
-    <tr
-      onClick={onClick}
-      style={{
-        background: even ? "var(--surface)" : "var(--bg)",
-        cursor: "pointer",
-        transition: "background 0.1s",
-      }}
-      onMouseEnter={e => e.currentTarget.style.background = "var(--teal-subtle)"}
-      onMouseLeave={e => e.currentTarget.style.background = even ? "var(--surface)" : "var(--bg)"}
-    >
-      {/* Patient name + avatar */}
-      <td style={{ padding: "13px 16px", borderBottom: "1px solid var(--border)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-          <div style={{
-            width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
-            background: `hsl(${((p.name.charCodeAt(0) * 7) % 360)}, 40%, 88%)`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 12, fontWeight: 700,
-            color: `hsl(${((p.name.charCodeAt(0) * 7) % 360)}, 50%, 30%)`,
-          }}>
-            {p.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
-          </div>
-          <div>
-            <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-primary)" }}>{p.name}</div>
-            <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 1 }}>
-              {p.age ? `Age ${p.age}` : "—"}
-              {p.email && ` · ${p.email}`}
-            </div>
-          </div>
+    <div style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: 12, padding: "16px 18px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <div style={{ width: 8, height: 8, borderRadius: "50%", background: c.dot, flexShrink: 0 }} />
+        <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--text-primary)", lineHeight: 1.35 }}>{insight.title}</div>
+      </div>
+      <div style={{ fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.5, marginBottom: insight.cta ? 12 : 0, paddingLeft: 16 }}>{insight.desc}</div>
+      {insight.cta && (
+        <div style={{ paddingLeft: 16 }}>
+          <button style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: c.text, fontSize: 12.5, fontWeight: 600, fontFamily: "var(--font-body)" }}>
+            {insight.cta} →
+          </button>
         </div>
-      </td>
-
-      {/* Fitzpatrick / Glogau */}
-      <td style={{ padding: "13px 16px", borderBottom: "1px solid var(--border)" }}>
-        <div style={{ display: "flex", gap: 6 }}>
-          <span style={{
-            padding: "3px 8px", borderRadius: 5,
-            background: "var(--bg)", border: "1px solid var(--border)",
-            fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)",
-            fontFamily: "var(--font-mono)",
-          }}>F-{fitz}</span>
-          <span style={{
-            padding: "3px 8px", borderRadius: 5,
-            background: "var(--bg)", border: "1px solid var(--border)",
-            fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)",
-            fontFamily: "var(--font-mono)",
-          }}>G-{glogau}</span>
-        </div>
-      </td>
-
-      {/* Top concern */}
-      <td style={{ padding: "13px 16px", borderBottom: "1px solid var(--border)" }}>
-        {p.top_concern ? (
-          <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>{p.top_concern}</span>
-        ) : (
-          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>No analysis yet</span>
-        )}
-      </td>
-
-      {/* Score */}
-      <td style={{ padding: "13px 16px", borderBottom: "1px solid var(--border)" }}>
-        {p.latest_score != null ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: "50%",
-              background: `${scoreColor}18`,
-              border: `2px solid ${scoreColor}`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 11.5, fontWeight: 700, color: scoreColor,
-              fontFamily: "var(--font-mono)",
-            }}>
-              {p.latest_score.toFixed(1)}
-            </div>
-            <ScoreBar score={p.latest_score} color={scoreColor} />
-          </div>
-        ) : (
-          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>—</span>
-        )}
-      </td>
-
-      {/* Last scan */}
-      <td style={{ padding: "13px 16px", borderBottom: "1px solid var(--border)" }}>
-        <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-          {p.last_session_at ? formatDate(p.last_session_at) : "—"}
-        </span>
-      </td>
-
-      {/* Session count */}
-      <td style={{ padding: "13px 16px", borderBottom: "1px solid var(--border)" }}>
-        <span style={{
-          fontSize: 12, fontWeight: 600,
-          background: "var(--bg)", border: "1px solid var(--border)",
-          borderRadius: 5, padding: "3px 8px",
-          color: "var(--text-secondary)", fontFamily: "var(--font-mono)",
-        }}>{p.session_count || 0}</span>
-      </td>
-
-      {/* CTA */}
-      <td style={{ padding: "13px 16px", borderBottom: "1px solid var(--border)" }}>
-        <span style={{
-          fontSize: 12, fontWeight: 600, color: "var(--teal)",
-          display: "flex", alignItems: "center", gap: 4,
-        }}>
-          View <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M2 5.5h7M6 2.5l3 3-3 3"/></svg>
-        </span>
-      </td>
-    </tr>
-  );
-}
-
-function ScoreBar({ score, color }) {
-  return (
-    <div style={{ width: 56, height: 4, background: "var(--border)", borderRadius: 2, overflow: "hidden" }}>
-      <div style={{ width: `${(score / 10) * 100}%`, height: "100%", background: color, borderRadius: 2 }} />
+      )}
     </div>
   );
 }
 
-function KPICard({ label, value, sub, accent }) {
+function KPITile({ label, value, sub, accent, warn }) {
   return (
     <div style={{
-      background: "var(--surface)", border: `1px solid ${accent ? "var(--teal)" : "var(--border)"}`,
-      borderRadius: 10, padding: "20px 22px",
-      borderLeft: accent ? "4px solid var(--teal)" : undefined,
-      boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+      background: "var(--surface)", borderRadius: 12, padding: "15px 17px",
+      border: warn ? "1px solid #f5d9a0" : "1px solid var(--border)",
+      borderLeft: warn ? "4px solid var(--amber)" : accent ? "4px solid var(--teal)" : "1px solid var(--border)",
     }}>
-      <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: 10 }}>{label}</div>
-      <div style={{ fontSize: 34, fontWeight: 800, color: accent ? "var(--teal)" : "var(--text-primary)", fontFamily: "var(--font-display)", lineHeight: 1 }}>{value}</div>
-      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>{sub}</div>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 8 }}>{label}</div>
+      <div style={{
+        fontFamily: "var(--font-display)", fontSize: 30, lineHeight: 1,
+        color: warn ? "var(--amber)" : accent ? "var(--teal)" : "var(--text-primary)",
+      }}>{value}</div>
+      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 7 }}>{sub}</div>
     </div>
   );
 }
 
-function formatDate(iso) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+function UrgencyPill({ score }) {
+  if (score == null) return <span style={{ fontSize: 11.5, fontWeight: 600, padding: "3px 8px", borderRadius: 999, background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text-muted)" }}>No scan</span>;
+  if (score < 4) return <span style={{ fontSize: 11.5, fontWeight: 600, padding: "3px 8px", borderRadius: 999, background: "var(--red-subtle)", border: "1px solid #f5c6c6", color: "var(--red)" }}>High priority</span>;
+  if (score < 5.5) return <span style={{ fontSize: 11.5, fontWeight: 600, padding: "3px 8px", borderRadius: 999, background: "var(--amber-subtle)", border: "1px solid #f5d9a0", color: "var(--amber)" }}>Follow-up</span>;
+  return <span style={{ fontSize: 11.5, fontWeight: 600, padding: "3px 8px", borderRadius: 999, background: "var(--green-subtle)", border: "1px solid #bbddd0", color: "var(--green)" }}>On track</span>;
 }
+
+function ScoreBadge({ score }) {
+  if (score == null) return <span style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "var(--font-mono)", minWidth: 32, textAlign: "right" }}>—</span>;
+  const color = score >= 7.5 ? "var(--green)" : score >= 5.5 ? "var(--teal)" : score >= 4 ? "var(--amber)" : "var(--red)";
+  return (
+    <div style={{
+      width: 34, height: 34, borderRadius: "50%",
+      border: `2px solid ${color}`, background: `${color}15`,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: 11, fontWeight: 700, color, fontFamily: "var(--font-mono)",
+    }}>
+      {score.toFixed(1)}
+    </div>
+  );
+}
+
+function timeAgo(iso) {
+  const diff = Date.now() - new Date(iso);
+  const days = Math.floor(diff / 86400000);
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
+}
+
+// Shared styles
+const card = { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" };
+const cardHead = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 18px", borderBottom: "1px solid var(--border)" };
+const cardTitle = { fontFamily: "var(--font-display)", fontSize: 16, color: "var(--text-primary)", fontWeight: 400 };
+const cardSub = { fontSize: 12, color: "var(--text-muted)", marginTop: 1 };
+const linkBtn = { background: "none", border: "none", cursor: "pointer", color: "var(--teal)", fontSize: 12.5, fontWeight: 600, fontFamily: "var(--font-body)", padding: 0, whiteSpace: "nowrap" };
