@@ -7,12 +7,14 @@ import ProgressPage from "../components/ProgressPage";
 import SettingsPage from "../components/SettingsPage";
 import IntegrationsPage from "../components/IntegrationsPage";
 import MessagesPage from "../components/MessagesPage";
+import GlowaAcademyPage from "../components/GlowaAcademyPage";
+import GlowaMarketingPage from "../components/GlowaMarketingPage";
 
 export default function Dashboard({ onUnauth }) {
   const { apiKey, logout } = useAuth();
   const client = apiClient(apiKey);
 
-  const [screen, setScreen] = useState("overview"); // "overview" | "patients" | "patient" | "session" | "progress" | "settings" | "messages" | "integrations"
+  const [screen, setScreen] = useState("overview"); // "overview" | "patients" | "patient" | "session" | "progress" | "settings" | "messages" | "integrations" | "academy" | "marketing"
   const [patients, setPatients] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [selectedSession, setSelectedSession] = useState(null);
@@ -124,6 +126,11 @@ export default function Dashboard({ onUnauth }) {
             <NavItem icon={<ProgressIcon />} label="Progress" active={screen === "progress"} onClick={() => { setScreen("progress"); setSelectedPatient(null); setSelectedSession(null); }} />
             <NavItem icon={<SettingsIcon />} label="Settings" active={screen === "settings"} onClick={() => { setScreen("settings"); setSelectedPatient(null); setSelectedSession(null); }} />
             <NavItem icon={<IntegrationsIcon />} label="Integrations" active={screen === "integrations"} onClick={() => { setScreen("integrations"); setSelectedPatient(null); setSelectedSession(null); }} />
+          </SideNavSection>
+
+          <SideNavSection label="Grow">
+            <NavItem icon={<AcademyIcon />} label="Glowa Academy" active={screen === "academy"} onClick={() => { setScreen("academy"); setSelectedPatient(null); setSelectedSession(null); }} isNew />
+            <NavItem icon={<MarketingIcon />} label="Glowa Marketing" active={screen === "marketing"} onClick={() => { setScreen("marketing"); setSelectedPatient(null); setSelectedSession(null); }} isNew />
           </SideNavSection>
 
           {selectedPatient && (
@@ -255,6 +262,12 @@ export default function Dashboard({ onUnauth }) {
           {screen === "integrations" && (
             <IntegrationsPage onUnauth={() => { logout(); onUnauth(); }} />
           )}
+          {screen === "academy" && (
+            <GlowaAcademyPage />
+          )}
+          {screen === "marketing" && (
+            <GlowaMarketingPage />
+          )}
         </main>
       </div>
     </div>
@@ -276,7 +289,7 @@ function SideNavSection({ label, children }) {
   );
 }
 
-function NavItem({ icon, label, active, onClick, badge, indent }) {
+function NavItem({ icon, label, active, onClick, badge, indent, isNew }) {
   return (
     <button onClick={onClick} style={{
       width: "100%", display: "flex", alignItems: "center", gap: 9,
@@ -298,6 +311,13 @@ function NavItem({ icon, label, active, onClick, badge, indent }) {
           borderRadius: 10, padding: "1px 6px",
         }}>{badge}</span>
       )}
+      {isNew && !badge && (
+        <span style={{
+          fontSize: 9, fontWeight: 700, letterSpacing: "0.06em",
+          background: "var(--teal)", color: "#fff",
+          borderRadius: 4, padding: "2px 5px", textTransform: "uppercase",
+        }}>New</span>
+      )}
     </button>
   );
 }
@@ -307,8 +327,10 @@ function Breadcrumb({ screen, patient, session }) {
     : screen === "settings" ? ["Settings"]
       : screen === "progress" ? ["Progress"]
         : screen === "integrations" ? ["Integrations"]
-          : ["Patients"];
-  if (patient && !["settings", "progress", "integrations", "overview"].includes(screen)) parts.push(patient.name);
+          : screen === "academy" ? ["Grow", "Glowa Academy"]
+            : screen === "marketing" ? ["Grow", "Glowa Marketing"]
+              : ["Patients"];
+  if (patient && !["settings", "progress", "integrations", "overview", "academy", "marketing"].includes(screen)) parts.push(patient.name);
   if (session && screen === "session") parts.push(`Scan · ${formatDate(session.created_at)}`);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text-muted)" }}>
@@ -380,5 +402,19 @@ const IntegrationsIcon = () => (
 const MessagesIcon = () => (
   <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
     <path d="M1.5 3.5a1.5 1.5 0 011.5-1.5h7a1.5 1.5 0 011.5 1.5v5a1.5 1.5 0 01-1.5 1.5H5l-2.5 2v-2H3a1.5 1.5 0 01-1.5-1.5v-5z"/>
+  </svg>
+);
+
+const AcademyIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1.5 5l5-3 5 3-5 3-5-3z" />
+    <path d="M4 6.5v2.5c0 1 1.1 2 2.5 2s2.5-1 2.5-2V6.5" />
+    <path d="M11.5 5v3.5" />
+  </svg>
+);
+
+const MarketingIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6.5 2l1.1 2.7L10.5 5l-2.6 2.5 0.7 3.5L6.5 9.5 4.4 11l0.7-3.5L2.5 5l2.9-.3z" />
   </svg>
 );
