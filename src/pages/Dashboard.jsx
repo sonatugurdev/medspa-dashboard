@@ -153,9 +153,6 @@ export default function Dashboard({ onUnauth }) {
 
         {/* Bottom */}
         <div style={{ borderTop: "1px solid var(--border)", padding: "14px 16px" }}>
-          <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginBottom: 8, lineHeight: 1.4 }}>
-            <span style={{ color: "var(--teal)", fontWeight: 600 }}>●</span> Connected to backend
-          </div>
           <button onClick={() => { logout(); onUnauth(); }} style={{
             width: "100%", padding: "7px 10px",
             background: "transparent", border: "1px solid var(--border)",
